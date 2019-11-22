@@ -51,8 +51,6 @@ SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
 WebServer Server;          
 AutoConnect Portal(Server);
 AutoConnectConfig acConfig;
-AutoConnectCredential credential(CREDENTIAL_OFFSET);
-station_config_t config;
 /***********************************************************************************
   TESTING STUFF
 ***********************************************************************************/
@@ -68,6 +66,8 @@ void rootPage() {
 }
 // Delete all SSID credentials to force the captive portal to start - called if the user button is pressed at start up.
 void deleteAllCredentials(void) {
+  AutoConnectCredential credential(CREDENTIAL_OFFSET);
+  station_config_t config;
   int8_t nRoot = 0;
   uint8_t ent = credential.entries();
   Serial.print(F("Delete stored credentials: "));
@@ -149,7 +149,7 @@ void setup() {
   if (digitalRead(pinButton) == LOW){
     deleteAllCredentials();
   }
-  // Set a hook for the portal to be able to call back to a routine avove that displays a message on the OLED telling the user that config is required.
+  // Set a hook for the portal to be able to call back to a routine above that displays a message on the OLED telling the user that config is required.
   Portal.onDetect(startCaptivePortal);
   // Start the portal. It will either connect to the WiFi with known credentials or it will launch the captive portal soft AP.
   acEnable = Portal.begin(); 
