@@ -66,6 +66,27 @@ void rootPage() {
 }
 // Delete all SSID credentials to force the captive portal to start - called if the user button is pressed at start up.
 void deleteAllCredentials(void) {
+  
+  bool retVal;
+
+  Serial.println(F("The sledgehammer approach:"));
+  Serial.println(F("Instanciate a 'Preferences' object"));
+  Preferences prefs;
+
+  Serial.println(F("Call .begin() with AC_CREDIT as the namespace"));
+  retVal = prefs.begin("AC_CREDT", false);
+  Serial.print(F("prefs.begin('AC_CREDT', false) returned "));Serial.println(retVal);
+
+  Serial.println(F("Call the .clear() method of the 'Preferences' object"));
+  retVal = prefs.clear();
+  Serial.print(F("prefs.clear() returned "));Serial.println(retVal);
+
+  Serial.println(F("Call the .end() method of the 'Preferences' object"));
+  prefs.end();
+ 
+  
+
+  /*
   AutoConnectCredential credential(CREDENTIAL_OFFSET);
   station_config_t config;
   int8_t nRoot = 0;
@@ -76,6 +97,7 @@ void deleteAllCredentials(void) {
     credential.load(nRoot, &config);
     credential.del((const char*)&config.ssid[0]);
   }
+  */
 }
 // Send text to the OLED screen
 void lcdMessage(String msg1, String msg2 = "", String msg3 = ""){
@@ -147,6 +169,7 @@ void setup() {
   //    *If there are previously stored credentials then we will connect, assuming the credentials match the SSID where the device has started up.
   //    *If the button is pressed or the device has never had any credentials, the device will start the captive portal.
   if (digitalRead(pinButton) == LOW){
+    Serial.println(F("The user button is pressed - delete all credentials so that the Soft AP and captive portal are started."));
     deleteAllCredentials();
   }
   // Set a hook for the portal to be able to call back to a routine above that displays a message on the OLED telling the user that config is required.
