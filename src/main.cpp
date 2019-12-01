@@ -9,6 +9,7 @@
 #include <AutoConnectCredential.h>
 #include <PageBuilder.h>
 #include <WiFiClient.h>
+#include <Preferences.h>
 #include "SSD1306.h"
 
 /*
@@ -51,9 +52,12 @@ SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
 WebServer Server;          
 AutoConnect Portal(Server);
 AutoConnectConfig acConfig;
+Preferences prefs;
 /***********************************************************************************
   TESTING STUFF
 ***********************************************************************************/
+
+
 
 
 /***********************************************************************************
@@ -65,39 +69,16 @@ void rootPage() {
   Server.send(200, "text/plain", content);
 }
 // Delete all SSID credentials to force the captive portal to start - called if the user button is pressed at start up.
-void deleteAllCredentials(void) {
-  
-  bool retVal;
-
-  Serial.println(F("The sledgehammer approach:"));
-  Serial.println(F("Instanciate a 'Preferences' object"));
-  Preferences prefs;
-
-  Serial.println(F("Call .begin() with AC_CREDIT as the namespace"));
-  retVal = prefs.begin("AC_CREDT", false);
-  Serial.print(F("prefs.begin('AC_CREDT', false) returned "));Serial.println(retVal);
-
-  Serial.println(F("Call the .clear() method of the 'Preferences' object"));
-  retVal = prefs.clear();
-  Serial.print(F("prefs.clear() returned "));Serial.println(retVal);
-
-  Serial.println(F("Call the .end() method of the 'Preferences' object"));
+void deleteAllCredentials() {
+  // Delete all SSID and PSK credentials from NVS and force the captive portal to start.
+  prefs.begin(AC_IDENTIFIER, false);
+  prefs.clear();
   prefs.end();
- 
-  
-
-  /*
-  AutoConnectCredential credential(CREDENTIAL_OFFSET);
-  station_config_t config;
-  int8_t nRoot = 0;
-  uint8_t ent = credential.entries();
-  Serial.print(F("Delete stored credentials: "));
-  Serial.println(ent);
-  while (ent--) {
-    credential.load(nRoot, &config);
-    credential.del((const char*)&config.ssid[0]);
-  }
-  */
+  // Adjust the AutoConnect config to force the captive portal to begin.
+  acConfig.apid = szSoftSSID;
+  acConfig.psk = CONFIG_PSK;
+  acConfig.immediateStart = true;
+  Portal.config(acConfig); 
 }
 // Send text to the OLED screen
 void lcdMessage(String msg1, String msg2 = "", String msg3 = ""){
@@ -125,7 +106,7 @@ void lcdMessage(String msg1, String msg2 = "", String msg3 = ""){
 }
 // Callback for the Portal object to allow us to notify the user that WiFi config is required as we have no credentials to connect to anything.
 bool startCaptivePortal(IPAddress ip){
-  lcdMessage(F("WiFi CONFIG REQD."), F("CONNECT TO:"), szSoftSSID);
+  lcdMessage(F("Config Required"), F("Connect to:"), szSoftSSID);
   return true;
 }
 /***********************************************************************************
@@ -148,8 +129,8 @@ void setup() {
   szSoftSSID.concat(F("-CAM"));
   acConfig.apid = szSoftSSID;
   acConfig.psk = CONFIG_PSK;
-  acConfig.boundaryOffset = CREDENTIAL_OFFSET;
   Portal.config(acConfig);
+
   // Output some info to the monitor terminal
   Serial.print(F("CapPortal SSID = "));
   Serial.println(szSoftSSID);
