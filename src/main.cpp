@@ -1,16 +1,21 @@
 /***********************************************************************************
   Includes
 ***********************************************************************************/
+#include <version.h>   //https://gitlab.com/pvojnisek/buildnumber-for-platformio/tree/master
 #include <Arduino.h>
 #include <WiFi.h>     
 #include <Wire.h>     
 #include <WebServer.h>     
-#include <AutoConnect.h>
+#include <AutoConnect.h>  //https://github.com/Hieromon/AutoConnect
 #include <AutoConnectCredential.h>
 #include <PageBuilder.h>
 #include <WiFiClient.h>
 #include <Preferences.h>
 #include "SSD1306.h"
+#include <NTPClient.h>
+#include <Time.h>
+#include <TimeLib.h>
+#include <Timezone.h>
 
 /*
 #include "OV2640.h"
@@ -29,7 +34,6 @@
 #define OLED_ADDRESS 0x3c
 #define I2C_SDA 14
 #define I2C_SCL 13
-#define CREDENTIAL_OFFSET 128
 
 #define CONFIG_PSK "forkcam2019"
 
@@ -53,6 +57,16 @@ WebServer Server;
 AutoConnect Portal(Server);
 AutoConnectConfig acConfig;
 Preferences prefs;
+AutoConnectAux videoSettings("/videosettings", "Video Target");
+AutoConnectText vtsHeader("Video Target Settings");
+AutoConnectText vtsCaption("Configure the server side target for video files.");
+AutoConnectInput txtTargetServer("txtTargetServer", "", "Target Path", "Target folder path");
+AutoConnectSubmit vtsSubmit("cmdSubmit", "Save", "/video_save");
+
+AutoConnectAux videoSettingsSaved("/video_save", "Video Target", false);
+AutoConnectText vssHeader("Video Target Saved");
+AutoConnectText vssCaption("Hit Back to configure the AP connection settings.");
+
 /***********************************************************************************
   TESTING STUFF
 ***********************************************************************************/
@@ -67,6 +81,15 @@ Preferences prefs;
 void rootPage() {
   char content[] = "Hello, world";
   Server.send(200, "text/plain", content);
+}
+// Postback handler for saving the video target settings
+String vtsSavedHandler(AutoConnectAux& aux, PageArgument& args){
+  AutoConnectAux* targetServerUri = Portal.aux(Portal.where());
+  AutoConnectInput& targetServer = targetServerUri->getElement<AutoConnectInput>("txtTargetServer");
+
+  Serial.println(targetServer.value);
+
+  return String("");
 }
 // Delete all SSID credentials to force the captive portal to start - called if the user button is pressed at start up.
 void deleteAllCredentials() {
@@ -110,7 +133,9 @@ bool startCaptivePortal(IPAddress ip){
   return true;
 }
 /***********************************************************************************
+  **********************************************************************************
   SETUP CODE
+  **********************************************************************************
 ***********************************************************************************/
 void setup() {
   // Start the serial object so we can output information along the way
@@ -130,7 +155,6 @@ void setup() {
   acConfig.apid = szSoftSSID;
   acConfig.psk = CONFIG_PSK;
   Portal.config(acConfig);
-
   // Output some info to the monitor terminal
   Serial.print(F("CapPortal SSID = "));
   Serial.println(szSoftSSID);
@@ -142,10 +166,10 @@ void setup() {
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   Serial.println(F("Display Initalised."));
-  lcdMessage(F("BOOTING"), F("PLEASE WAIT..."));
-  delay(500);
+  lcdMessage(F("BOOTING"), F("Fork Cam"), VERSION_SHORT);
+  delay(1000);
   // Tell the user we are attempting to connect to an access point
-  lcdMessage(F("ATTEMPTING TO"), F("CONNECT TO"), F("WiFi"));
+  lcdMessage(F("Connecting to"), F("WiFi..."), VERSION_SHORT);
   //  One of two things will happen:
   //    *If there are previously stored credentials then we will connect, assuming the credentials match the SSID where the device has started up.
   //    *If the button is pressed or the device has never had any credentials, the device will start the captive portal.
@@ -153,6 +177,12 @@ void setup() {
     Serial.println(F("The user button is pressed - delete all credentials so that the Soft AP and captive portal are started."));
     deleteAllCredentials();
   }
+  // Set up the additional config web pages we need
+  videoSettings.add({vtsHeader, vtsCaption, txtTargetServer, vtsSubmit});
+  Portal.join(videoSettings);
+  videoSettingsSaved.add({vssHeader, vssCaption});
+  Portal.join(videoSettingsSaved);
+  Portal.on("/video_save", vtsSavedHandler, AC_EXIT_AHEAD);
   // Set a hook for the portal to be able to call back to a routine above that displays a message on the OLED telling the user that config is required.
   Portal.onDetect(startCaptivePortal);
   // Start the portal. It will either connect to the WiFi with known credentials or it will launch the captive portal soft AP.
@@ -165,7 +195,9 @@ void setup() {
   }
 }
 /***********************************************************************************
+  **********************************************************************************
   RUNTIME LOOP
+  **********************************************************************************
 ***********************************************************************************/
 void loop() {
 
